@@ -35,6 +35,7 @@
     (let [node (zip/node loc)]
 
       (cond
+
         (zip/end? loc)
         (zip/root loc)
 
@@ -52,11 +53,11 @@
                                                          [(xml/element :color {} "ff00ff00")
                                                           (xml/element :width {} "2")])))))
 
-
         (= :PolyStyle (:tag node))
         (recur
           (zip/next
-            (zip/replace loc (xml/element :PolyStyle {} (xml/element :color {} "8000ff00")))))
+            (zip/edit loc
+                      (fn [node] (assoc node :content [(xml/element :color {} "8000ff00")])))))
 
 
         (= :coordinates (:tag node))
@@ -75,16 +76,14 @@
 
       (when (and (str/ends-with? kmz-file-name ".kmz")
                  (not (str/includes? kmz-file-name file-pref)))
-
         (pp/pprint [:found-kmz-file  (.getName kmz-file)])
-
         (with-open [input-stream (.getInputStream zip-file file)]
           (let [original-xml (xml/parse input-stream)
                 transformed-xml (transform (zip/xml-zip original-xml))
                 new-xml (xml/emit-str transformed-xml)
                 new-byte-array (.getBytes new-xml)]
 
-            (pp/pprint [original-xml transformed-xml (xml/emit-str transformed-xml)])
+            #_(pp/pprint [original-xml transformed-xml (xml/emit-str transformed-xml)])
             (pp/pprint [:transforming (.getAbsolutePath kmz-file) :writing-to new-file-name])
             (println)
             (write-kmz new-file-name (.getName file) new-byte-array)))))))
