@@ -16,7 +16,7 @@
     (java.util.zip ZipOutputStream)
     (java.util.zip ZipEntry)))
 
-(def file-pref "read-replace-kmz-fix")
+(def file-pref "fix")
 
 (defn write-kmz [^String kmz-file-name name data]
   (let [out-file (File. kmz-file-name)
@@ -30,29 +30,39 @@
     (.close output-stream)))
 
 
-#_(loop [z z]
-  (if (zip/end? z)
-    (-> z zip/root xml/emit-str)
-    (let [n (zip/node z)]
-      (if (string? n)
-        (if (contains-special-chars? n)
-          (recur (zip/edit z xml/->CData))
-          (recur (zip/next z)))
-        (recur (zip/next z))))))
-
-
 (defn transform [xml]
-  (loop [xml xml]
-    (if (zip/end? xml)
-      (zip/root xml)
-      (let [node (zip/node xml)]
-        (if (= :LineStyle (:tag node))
+  (loop [loc xml]
+    (let [node (zip/node loc)]
 
-          (do (println node)
-              (recur (zip/next xml))
-              )
+      (cond
+        (zip/end? loc)
+        (zip/root loc)
 
-          (recur (zip/next xml)))))))
+        (and (= :name (:tag node))
+             (= '("T") (:content node)))
+
+        (recur
+          (zip/next
+            (zip/edit loc (fn [node]
+                            (assoc node :content '("S"))))))
+
+        (= :LineStyle (:tag node))
+        (recur
+          (zip/next (zip/edit loc (fn [node] (assoc node :content
+                                                         [(xml/element :color {} "ff00ff00")
+                                                          (xml/element :width {} "2")])))))
+
+
+        (= :PolyStyle (:tag node))
+        (recur
+          (zip/next
+            (zip/replace loc (xml/element :PolyStyle {} (xml/element :color {} "8000ff00")))))
+
+
+        (= :coordinates (:tag node))
+        (recur (zip/next (zip/edit loc (fn [node] (update node :content #(map str/trim %))))))
+
+        :else (recur (zip/next loc))))))
 
 
 (defn open-kmz [^File kmz-file]
@@ -70,21 +80,14 @@
 
         (with-open [input-stream (.getInputStream zip-file file)]
           (let [original-xml (xml/parse input-stream)
-
-                ;; TODO, do some transformation of the data
-
-                _ (pp/pprint [:new (transform (zip/xml-zip original-xml))])
-                new-xml (xml/emit-str original-xml)
+                transformed-xml (transform (zip/xml-zip original-xml))
+                new-xml (xml/emit-str transformed-xml)
                 new-byte-array (.getBytes new-xml)]
 
-            #_(pp/pprint original-xml)
-
-            #_(pp/pprint [:transforming (.getAbsolutePath kmz-file) :writing-to new-file-name])
+            (pp/pprint [original-xml transformed-xml (xml/emit-str transformed-xml)])
+            (pp/pprint [:transforming (.getAbsolutePath kmz-file) :writing-to new-file-name])
             (println)
-
-            #_(write-kmz new-file-name (.getName file) new-byte-array)))
-
-        ))))
+            (write-kmz new-file-name (.getName file) new-byte-array)))))))
 
 (defn -main [& args]
   (let [folder (File. ^String (first args))]
