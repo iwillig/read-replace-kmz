@@ -10,8 +10,8 @@
     (java.io PipedOutputStream)
     (java.io PipedInputStream)
     (java.io FileOutputStream)
+    (java.text SimpleDateFormat)
     (java.io File)
-    (java.nio.file Paths)
     (java.util.zip ZipFile)
     (java.util.zip ZipOutputStream)
     (java.util.zip ZipEntry)))
@@ -31,7 +31,9 @@
 
 
 (defn transform [xml]
+
   (loop [loc xml]
+
     (let [node (zip/node loc)]
 
       (cond
@@ -40,12 +42,12 @@
         (zip/root loc)
 
         (and (= :name (:tag node))
-             (= '("T") (:content node)))
+             (= '("S") (:content node)))
 
         (recur
           (zip/next
             (zip/edit loc (fn [node]
-                            (assoc node :content '("S"))))))
+                            (assoc node :content '("T"))))))
 
         (= :LineStyle (:tag node))
         (recur
@@ -59,41 +61,47 @@
             (zip/edit loc
                       (fn [node] (assoc node :content [(xml/element :color {} "8000ff00")])))))
 
-
         (= :coordinates (:tag node))
         (recur (zip/next (zip/edit loc (fn [node] (update node :content #(map str/trim %))))))
 
         :else (recur (zip/next loc))))))
 
 
-(defn open-kmz [^File kmz-file]
-  (let [kmz-file-name (.getName kmz-file)
-        parent-path (.getAbsolutePath (.getParentFile kmz-file))
-        new-file-name (str (File. parent-path (str file-pref "-" kmz-file-name)))
-        zip-file (ZipFile. kmz-file)]
+(defn find-type [xml])
 
-    (doseq [file (enumeration-seq (.entries zip-file))]
+(defn transform-kmz [^File kmz-file]
+  (let [kmz-file-name (.getName kmz-file)]
 
-      (when (and (str/ends-with? kmz-file-name ".kmz")
-                 (not (str/includes? kmz-file-name file-pref)))
-        (pp/pprint [:found-kmz-file  (.getName kmz-file)])
-        (with-open [input-stream (.getInputStream zip-file file)]
-          (let [original-xml (xml/parse input-stream)
-                transformed-xml (transform (zip/xml-zip original-xml))
-                new-xml (xml/emit-str transformed-xml)
-                new-byte-array (.getBytes new-xml)]
+    (when (and (str/ends-with? kmz-file-name ".kmz")
+               (not (str/includes? kmz-file-name file-pref)))
 
-            #_(pp/pprint [original-xml transformed-xml (xml/emit-str transformed-xml)])
-            (pp/pprint [:transforming (.getAbsolutePath kmz-file) :writing-to new-file-name])
-            (println)
-            (write-kmz new-file-name (.getName file) new-byte-array)))))))
+      (let [parent-path (.getAbsolutePath (.getParentFile kmz-file))
+            new-file-name (str (File. parent-path (str file-pref "-" kmz-file-name)))
+            zip-file (ZipFile. kmz-file)]
+
+        (doseq [file (enumeration-seq (.entries zip-file))]
+
+          (pp/pprint [:found-kmz-file  (.getName kmz-file)])
+
+          (with-open [input-stream (.getInputStream zip-file file)]
+
+            (let [original-xml (xml/parse input-stream)
+                  _ (pp/pprint original-xml)
+                  transformed-xml (transform (zip/xml-zip original-xml))
+
+                  new-xml (xml/emit-str transformed-xml)
+                  new-byte-array (.getBytes new-xml)]
+
+              (write-kmz new-file-name (.getName file) new-byte-array))))))))
 
 (defn -main [& args]
   (let [folder (File. ^String (first args))]
-    (when (.isDirectory folder)
-      (doseq [file (file-seq folder)]
-        (when-not (.isDirectory file)
-          (open-kmz file))))))
+    (if (.isDirectory folder)
+      (let [file-seq (file-seq folder)]
+        (doseq [file file-seq]
+          (when-not (.isDirectory file)
+            (transform-kmz file))))
+      (transform-kmz folder))))
 
 
 (comment

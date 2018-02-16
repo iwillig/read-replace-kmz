@@ -1,14 +1,22 @@
 # read-replace-kmz
 
-A Clojure library designed to ... well, that part is up to you.
+A tool for transforming kmz files for chris willig
+
+## Install
+
+```shell
+lein uberjar
+```
 
 ## Usage
 
-FIXME
+
+```shell
+java -jar target/read-replace.jar <target-dir>
+
+```
+
 
 ## License
 
-Copyright © 2018 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Copyright © 2018 Ivan Willig

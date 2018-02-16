@@ -13,4 +13,5 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/data.xml "0.0.8"]
                  [org.clojure/data.zip "0.1.2"]
+                 [org.clojure/tools.cli "0.3.5"]
                  [org.clojure/tools.namespace "0.2.11"]])
